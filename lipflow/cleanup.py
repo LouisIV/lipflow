@@ -8,7 +8,9 @@ before can usually recover the intended sentence.
 Backends. You pick one in the menu (saved as "cleanup" in settings) or with --cleanup; "auto" uses
 the first available of claude, local, ollama, basic:
   claude  – ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN) set
-  codex   – your ChatGPT plan through the Codex CLI (`codex login`); LIPFLOW_CODEX_MODEL; only if chosen
+  codex   – your ChatGPT plan through the Codex CLI (`codex login`); LIPFLOW_CODEX_MODEL; only if chosen.
+            Also looked up in ~/.local/bin, Homebrew, and npm global bins, because a Spotlight/Finder
+            launch does not inherit your shell PATH.
   local   – a tiny on-device model via MLX (Qwen3-0.6B 4-bit, ~350 MB, ~0.2 s); LIPFLOW_LOCAL_MODEL
   ollama  – a local Ollama server on :11434 (LIPFLOW_OLLAMA_MODEL, default qwen3:4b); only if chosen
   basic   – offline casing + punctuation rules
@@ -176,8 +178,46 @@ CHOICES = {"auto": "Automatic", "claude": "Claude", "codex": "ChatGPT (Codex CLI
            "ollama": "Ollama", "basic": "Basic rules only"}
 
 
+def _cli_dirs() -> list[str]:
+    """Places a CLI is installed that a GUI app's PATH usually does not include.
+
+    macOS Launch Services starts menu-bar apps with /usr/bin:/bin:/usr/sbin:/sbin
+    (sometimes plus /usr/local/bin). The Codex installer uses ~/.local/bin, Homebrew
+    uses /opt/homebrew/bin, and `npm install -g` follows whichever Node is active.
+    """
+    home = os.path.expanduser("~")
+    dirs = [
+        os.path.join(home, ".local", "bin"),
+        os.path.join(home, ".codex", "packages", "standalone", "current", "bin"),
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        os.path.join(home, ".npm-global", "bin"),
+        os.path.join(home, "Library", "pnpm"),
+        os.path.join(home, ".bun", "bin"),
+    ]
+    for root in (
+        os.path.join(home, ".local", "share", "mise", "installs", "node"),
+        os.path.join(home, ".nvm", "versions", "node"),
+    ):
+        if os.path.isdir(root):
+            for name in os.listdir(root):
+                dirs.append(os.path.join(root, name, "bin"))
+    return dirs
+
+
+def ensure_tool_path() -> None:
+    """Prepend install dirs so shutil.which and later subprocesses can see CLIs."""
+    cur = os.environ.get("PATH", "")
+    have = set(cur.split(os.pathsep)) if cur else set()
+    extra = [d for d in _cli_dirs() if d not in have and os.path.isdir(d)]
+    if extra:
+        os.environ["PATH"] = os.pathsep.join(extra + ([cur] if cur else []))
+
+
 def unavailable(backend: str) -> "str | None":
     """Why this backend can't be used right now, or None. Cheap: runs when the menu is built."""
+    if backend == "codex":
+        ensure_tool_path()
     if backend == "claude" and not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
         return "set ANTHROPIC_API_KEY"
     if backend == "codex" and not shutil.which("codex"):
@@ -309,6 +349,7 @@ class Cleaner:
     def _codex(self, candidates: list[str], context: str) -> "str | None":
         """One non-interactive `codex exec` turn on your ChatGPT plan. It runs read-only in an empty
         folder, so it can't touch your files or pick up a project's AGENTS.md, and leaves no session."""
+        ensure_tool_path()  # subprocess searches PATH; a GUI launch doesn't have the shell's
         prompt = f"{SYSTEM}\n\n{_user_prompt(candidates, context, self._words, self._similar)}"
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "reply.txt")
