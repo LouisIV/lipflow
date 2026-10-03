@@ -159,3 +159,21 @@ def test_backend_is_your_choice(monkeypatch):
     assert Cleaner("claude").backend == Cleaner("auto").backend
     monkeypatch.setattr(cleanup.shutil, "which", lambda name: None)
     assert cleanup.unavailable("codex") and Cleaner("codex").backend == Cleaner("auto").backend
+
+
+def test_codex_is_found_when_gui_path_omits_it(tmp_path, monkeypatch):
+    """Menu-bar apps get a minimal PATH. Codex in a normal install dir must still be selectable."""
+    import shutil
+    import stat
+    from lipflow import cleanup
+    from lipflow.cleanup import Cleaner
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    exe = bindir / "codex"
+    exe.write_text("#!/bin/sh\n")
+    exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin")
+    monkeypatch.setattr(cleanup, "_cli_dirs", lambda: [str(bindir)])
+    assert cleanup.unavailable("codex") is None
+    assert shutil.which("codex") == str(exe)
+    assert Cleaner("codex").backend == "codex"

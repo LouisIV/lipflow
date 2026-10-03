@@ -147,6 +147,8 @@ set a key, otherwise the on-device model, otherwise the offline rules.
    [Codex CLI](https://developers.openai.com/codex/cli) (`brew install --cask codex` or
    `npm install -g @openai/codex`), run `codex login`, then pick it in the menu. Each sentence is one
    read-only `codex exec` run in an empty folder. Override the model with `LIPFLOW_CODEX_MODEL`.
+   Opening Lipflow from Spotlight does not inherit your shell PATH; it still finds `codex` in
+   `~/.local/bin`, Homebrew, or npm's global bin.
 3. **On-device model**: Qwen3-0.6B 4-bit running in-process on Apple Silicon
    via MLX. About 350 MB, downloaded on first launch, and about 0.2 s per sentence, fully offline.
    Tiny models copy the formatting they're shown, so this one gets lowercase guesses and a few
