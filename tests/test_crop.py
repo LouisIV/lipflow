@@ -229,7 +229,8 @@ def test_overlay_and_compose_do_not_crash():
     assert plot_signal([0.1, 0.2, 0.15], 200, 40, 0, 1).shape == (40, 200, 3)
 
 
-def test_tune_subcommand_exists():
+def test_tune_subcommand_exists(monkeypatch):
+    monkeypatch.setenv("DISPLAY", "")  # Linux CI: pynput must not be imported just to parse --help
     from lipflow.__main__ import main
     with pytest.raises(SystemExit) as ei:
         main(["tune", "-h"])

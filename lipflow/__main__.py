@@ -30,16 +30,19 @@ def main(argv=None):
         for stream in (sys.stdout, sys.stderr):  # ✓ and → in a cp1252 console or a pipe
             if stream is not None and hasattr(stream, "reconfigure"):
                 stream.reconfigure(encoding="utf-8", errors="replace")
-        from .win.hotkey import DEFAULT_KEY, KEYS
+        # Names only: importing win.hotkey pulls pynput, which needs DISPLAY on Linux.
+        DEFAULT_KEY = "right_control"
+        key_choices = ("right_control", "right_alt", "left_alt", "right_shift")
     else:
         from .hotkey import KEYS
         DEFAULT_KEY = "right_option"
+        key_choices = tuple(KEYS)
 
     p = argparse.ArgumentParser(prog="lipflow", description="Silent dictation by lip reading.")
     sub = p.add_subparsers(dest="cmd")
 
     r = sub.add_parser("run", help="start the dictation app in the menu bar / system tray (default)")
-    r.add_argument("--key", default=DEFAULT_KEY, choices=list(KEYS), help="push-to-talk key")
+    r.add_argument("--key", default=DEFAULT_KEY, choices=list(key_choices), help="push-to-talk key")
     r.add_argument("--beam", type=int, default=4, help="beam size (higher = slower, about the same accuracy)")
     r.add_argument("--cleanup", default="auto", choices=["auto", "claude", "codex", "local", "ollama", "basic"])
     r.add_argument("--camera", default="auto",
