@@ -1,4 +1,4 @@
-"""lipflow [run] | lipflow file VIDEO | lipflow doctor"""
+"""lipflow [run] | lipflow file VIDEO | lipflow doctor | lipflow tune"""
 from __future__ import annotations
 
 import argparse
@@ -58,11 +58,16 @@ def main(argv=None):
     sub.add_parser("doctor", help="check permissions, camera and model files")
     sub.add_parser("onboard", help="open the setup window (permissions, Wispr import, train on your face)")
     sub.add_parser("train-lm", help="fine-tune the language model on your imported phrases")
+    t = sub.add_parser("tune", help="live webcam tool to tune the mouth crop (landmarks, scale, beard-safe anchors)")
+    t.add_argument("--camera", default="auto",
+                   help="'auto' (the built-in camera), a camera number, part of a camera's name (Mac), "
+                        "or a video file")
     w = sub.add_parser("import-wispr", help="learn your phrasing from your Wispr Flow history (stays local)")
     w.add_argument("--from-text", help="import a plain-text file of your writing instead (one phrase per line)")
 
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in {"run", "file", "doctor", "import-wispr", "onboard", "train-lm", "-h", "--help"}:
+    if not argv or argv[0] not in {"run", "file", "doctor", "import-wispr", "onboard", "train-lm",
+                                   "tune", "-h", "--help"}:
         argv.insert(0, "run")
     args = p.parse_args(argv)
     cmd = args.cmd
@@ -101,6 +106,10 @@ def main(argv=None):
     elif cmd == "doctor":
         from .doctor import doctor
         sys.exit(doctor())
+    elif cmd == "tune":
+        from .tune import run as run_tune
+        camera = int(args.camera) if str(args.camera).isdigit() else args.camera
+        sys.exit(run_tune(camera) or 0)
     else:
         Options, run = _app()
         camera = int(args.camera) if args.camera.isdigit() else args.camera

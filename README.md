@@ -195,6 +195,33 @@ Options: `uv run lipflow --help`
 
 Lip-read a video file: `uv run lipflow file talk.mp4 --start 10 --end 20`
 
+### Tune the mouth crop
+
+If the dictation lip viewer doesn't follow your mouth (a beard can confuse the chin / lower-lip landmarks, pulling the crop down onto the beard), run the live tuner:
+
+```sh
+cd ~/code/lipflow
+uv run lipflow tune              # or: uv run python -m lipflow tune
+# uv run lipflow tune --camera 1  # another camera, or a video file path
+```
+
+Two windows open: the camera with face box, lip landmarks and the model-crop rectangle, next to the exact 96×96 grayscale patch the lip reader receives, plus a mouth-opening plot and live numbers (landmark score, dropout, crop jitter).
+
+| Knob | What it does |
+|---|---|
+| **detect%** / **track%** | MediaPipe face detection and tracking confidence (default 50). Raise if it locks onto beard/background; lower if your face drops out. |
+| **anchor** | Which landmarks set the mouth centre used for alignment and the crop: **0 lips** (default, all lip points), **1 outer**, **2 inner**, **3 upper** (upper lip only — ignores chin/beard), **4 nose** (eyes+nose predict where the mouth should be; ignores lips entirely). |
+| **offsetY** | Shift the crop up/down in the aligned face. 40 is zero; drag *left* to move the crop up, off a beard. |
+| **scale%** | 100 is the training 96×96 of the aligned face. Lower = tighter on the lips; higher = more chin/cheeks. |
+| **align** | 1 (default) warps to the mean face, matching training. 0 skips the warp and crops in camera pixels. |
+| **smooth** | Landmark averaging window (default 12, same as dictation). 0 = no smoothing. |
+| **clahe** | Contrast-limited adaptive histogram equalization on the 96×96. Off by default. |
+| **bright** | Shift the crop's mean gray to the training mean. Off by default. |
+
+Keys: **s** save (written to the `crop` key in Lipflow's `settings.json` — `~/Library/Application Support/Lipflow/settings.json` on a Mac), **r** reset to defaults and save, **q** quit. Restart Lipflow after saving so dictation picks the new crop up. Anyone who never runs this keeps the original crop.
+
+The floating dictation HUD close-up is a *different* picture: a colour crop around the outer lips, mirrored, with no mean-face alignment. This tool shows what the model actually reads.
+
 ## How it works
 
 - **Model:** [Auto-AVSR](https://github.com/mpc001/auto_avsr) visual-only speech recognition trained
@@ -230,7 +257,7 @@ uv run pytest             # the paste test is opt-in: LIPFLOW_TEST_PASTE=1
 On Windows: `setup.ps1 -Samples`, then `uv run pytest`. CI runs the whole Windows setup and reads
 a real clip on every push (`.github/workflows/windows.yml`).
 
-Code map: `lipflow/face.py` (landmarks → mouth crops), `vsr.py` (model), `camera.py`, `hotkey.py`
+Code map: `lipflow/face.py` (landmarks → mouth crops), `crop.py` (saved mouth-crop knobs), `tune.py` (`lipflow tune`), `vsr.py` (model), `camera.py`, `hotkey.py`
 (Quartz event tap; pynput's macOS listener crashes on recent macOS), `paste.py`, `hud.py`,
 `cleanup.py`, `app.py` (wiring + menu bar). Windows: `lipflow/win/` (tray app, overlay, setup
 window, pynput key hook, clipboard paste). Shared by both: `ptt.py` (key timing), `dictation.py`,
