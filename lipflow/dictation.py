@@ -44,11 +44,12 @@ def clip_problem(rec) -> "tuple[str, str] | None":
 
 
 def rois_for(rec):
+    from .crop import load_crop_config
     from .face import mouth_rois
     from .vsr import LipReader
     ts, grays, anchors = rec.snapshot()
     idx = LipReader.resample(ts, len(ts))
-    return mouth_rois([grays[i] for i in idx], [anchors[i] for i in idx])
+    return mouth_rois([grays[i] for i in idx], [anchors[i] for i in idx], cfg=load_crop_config())
 
 
 def log_history(rec, candidates, text, secs, cleanup: str):

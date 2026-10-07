@@ -36,7 +36,8 @@ def transcribe_file(path: str, reader: LipReader | None = None, start: float = 0
     ts, grays, anchors = load_clip(path, tracker, start, end)
     tracker.close()
     idx = LipReader.resample(ts, len(ts))
-    rois = mouth_rois([grays[i] for i in idx], [anchors[i] for i in idx])
+    from .crop import load_crop_config
+    rois = mouth_rois([grays[i] for i in idx], [anchors[i] for i in idx], cfg=load_crop_config())
     if rois is None:
         raise RuntimeError("no face found in the video")
     if save_rois:

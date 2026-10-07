@@ -61,7 +61,8 @@ def build(force: bool = False) -> list[dict]:
             if not ts or sum(x is not None for x in anchors) < 0.8 * len(anchors):
                 continue
             idx = LipReader.resample(ts, len(ts))
-            rois = mouth_rois([grays[i] for i in idx], [anchors[i] for i in idx])
+            from .crop import load_crop_config
+            rois = mouth_rois([grays[i] for i in idx], [anchors[i] for i in idx], cfg=load_crop_config())
             if rois is not None:
                 items.append({"video": name, "start": a, "end": b, "text": text, "rois": rois})
     np.savez_compressed(CACHE, items=np.array(items, dtype=object))

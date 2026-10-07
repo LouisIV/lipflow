@@ -57,6 +57,38 @@ def list_cameras() -> list[dict]:
              "builtin": "BuiltIn" in str(d.deviceType())} for i, d in enumerate(devs)]
 
 
+def open_capture(pref, width: int = 1280, height: int = 720):
+    """Open a webcam or video file. Call from the main thread on macOS.
+
+    Returns (cap, file_fps) — file_fps is None for a live camera.
+    """
+    if isinstance(pref, str) and os.path.exists(pref):  # a video file standing in for the webcam (testing / demos)
+        cap = cv2.VideoCapture(pref)
+        if not cap.isOpened():
+            raise RuntimeError(f"Could not open {pref}")
+        return cap, cap.get(cv2.CAP_PROP_FPS) or 30.0
+    idx = resolve_camera(pref)
+    # DirectShow opens fast and keeps the order Windows lists cameras in; MSMF can take seconds.
+    if WINDOWS:
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+    elif LINUX:
+        cap = cv2.VideoCapture(idx)
+    else:
+        cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+    if not cap.isOpened():
+        if WINDOWS:
+            raise RuntimeError("Could not open the camera. Turn on Settings → Privacy & security → Camera → "
+                               "Let desktop apps access your camera, and close other apps using it")
+        if LINUX:
+            raise RuntimeError("Could not open the camera. Check PipeWire/v4l2 and close other apps using it")
+        raise RuntimeError(f"Could not open the camera. Allow {WHO} in "
+                           "Settings → Privacy & Security → Camera")
+    return cap, None
+
+
 def resolve_camera(pref) -> "int | str":
     """'auto' → the Mac's own camera (never an iPhone); a name or id → that camera; an int or a
     video file path passes through."""
@@ -136,38 +168,15 @@ class Camera:
         self.close()
 
     def _open(self):
-        if isinstance(self.index, str) and os.path.exists(self.index):  # a video file standing in for the webcam (testing / demos)
-            cap = cv2.VideoCapture(self.index)
-            self._file_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-            if not cap.isOpened():
-                raise RuntimeError(f"Could not open {self.index}")
-            return cap
-        self._file_fps = None
-        idx = resolve_camera(self.index)
-        # DirectShow opens fast and keeps the order Windows lists cameras in; MSMF can take seconds.
-        if WINDOWS:
-            cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-        elif LINUX:
-            cap = cv2.VideoCapture(idx)
-        else:
-            cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        cap.set(cv2.CAP_PROP_FPS, 30)
-        if not cap.isOpened():
-            if WINDOWS:
-                raise RuntimeError("Could not open the camera. Turn on Settings → Privacy & security → Camera → "
-                                   "Let desktop apps access your camera, and close other apps using it")
-            if LINUX:
-                raise RuntimeError("Could not open the camera. Check PipeWire/v4l2 and close other apps using it")
-            raise RuntimeError(f"Could not open the camera. Allow {WHO} in "
-                               "Settings → Privacy & Security → Camera")
+        cap, self._file_fps = open_capture(self.index, self.width, self.height)
         return cap
 
     def _run(self):
         try:
             self._cap = self._open()
             if self._tracker is None:
+                from .crop import load_crop_config
+                load_crop_config()
                 self._tracker = FaceTracker()
             self.error = None
         except Exception as e:
